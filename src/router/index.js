@@ -10,7 +10,7 @@ const router = createRouter({
     {
       path: '/big-screen',
       name: 'big-screen',
-      component: () => import('@/views/big-screen.vue')
+      component: () => import('@/views/bigScreen/big-screen.vue')
     }
   ]
 })

@@ -14,28 +14,28 @@
           <div class="icons-container">
             <div class="item">
               <div class="icons-item building-icon">
-                <span class="number">{{ baseList.buildingTotal }}</span>
+                <span class="number">{{ parkInfo.base?.buildingTotal }}</span>
               </div>
               <div class="title">楼宇总数</div>
               <div class="unity">(栋)</div>
             </div>
             <div class="item">
               <div class="icons-item enterprise-icon">
-                <span class="number">{{ baseList.enterpriseTotal }}</span>
+                <span class="number">{{ parkInfo.base?.enterpriseTotal }}</span>
               </div>
               <div class="title">入驻企业总数</div>
               <div class="unity">(家)</div>
             </div>
             <div class="item">
               <div class="icons-item car-icon">
-                <span class="number">{{ baseList.parkingTotal }}</span>
+                <span class="number">{{ parkInfo.base?.parkingTotal }}</span>
               </div>
               <div class="title">车位总数</div>
               <div class="unity">(个)</div>
             </div>
             <div class="item">
               <div class="icons-item rod-icon">
-                <span class="number">{{ baseList.chargePoleTotal }}</span>
+                <span class="number">{{ parkInfo.base?.chargePoleTotal }}</span>
               </div>
               <div class="title">一体杆总数</div>
               <div class="unity">(个)</div>
@@ -60,143 +60,116 @@
         </div>
       </div>
     </div>
+    <div class="model-container">
+      <!-- 进度条 -->
+      <LoadingComponent :loading="showLoading" />
+      <!-- 准备3D渲染节点 -->
+      <canvas class="canvas-3d" ref="ref3d"></canvas>
+      <div
+        v-if="modelStatus"
+        id="t"
+        :class="{ animate__zoomIn: modelStatus }"
+        :style="{ left: x + 'px', top: y + 'px' }"
+        class="tip animate__animated"
+      >
+        <span class="close" @mousedown.stop="close"></span>
+        <div class="header">
+          {{ buildingInfo.name || buildingInfo.areaName }}
+        </div>
+      </div>
+    </div>
   </VScaleScreen>
 </template>
 
 <script setup>
-import * as echarts from 'echarts'
-import { getInfoApi } from '@/api/park'
-import { onMounted, ref } from 'vue'
+// 导入loading组件
+import LoadingComponent from '@/components/LoadingComponent.vue'
+import { onMounted, ref, computed } from 'vue'
+import { getBuildingInfoApi, getAreaInfoApi } from '@/api/park'
 import VScaleScreen from 'v-scale-screen'
-const baseList = ref({})
-const parkIncomeList = ref({})
-const parkIndustryList = ref([])
+import { useParkInfo, useInitBarChart, useInitPieChart } from './composables'
+// 导入模型解析构造函数
+import { Application } from '@splinetool/runtime'
+const { parkInfo, getInfo } = useParkInfo()
+const { initBarChart } = useInitBarChart(parkInfo)
+const { initPieChart } = useInitPieChart(parkInfo)
+const ref3d = ref(null)
+const showLoading = ref(false)
+const showModel = ref(false)
+const x = ref()
+const y = ref()
+const buildingInfo = ref({})
+const areaInfo = ref({})
+const init3dModel = () => {
+  // 开启loading
+  showLoading.value = true
+  let spline = new Application(ref3d.value)
+  spline.load('https://fe-hmzs.itheima.net/scene.splinecode').then(() => {
+    showLoading.value = false
+    spline.addEventListener('mouseDown', (e) => {
+      x.value = ''
+      y.value = ''
+      const params = e.target
+      if (params.name.indexOf('办公楼') !== -1) {
+        getBuildingInfo(params.id)
+        window.addEventListener('mousedown', (e) => {
+          x.value = e.offsetX
+          y.value = e.offsetY
+        })
+      } else if (params.name.indexOf('停车场') !== -1) {
+        getAreaInfo(params.id)
+        window.addEventListener('mousedown', (e) => {
+          x.value = e.offsetX
+          y.value = e.offsetY
+        })
+      }
+      showModel.value = true
+    })
+  })
+}
 
-const getInfo = async () => {
+const getBuildingInfo = async (id) => {
   try {
-    const {
-      data: { base, parkIncome, parkIndustry }
-    } = await getInfoApi()
-    baseList.value = base
-    parkIncomeList.value = parkIncome
-    parkIndustryList.value = parkIndustry
-    // console.log('base', base.value)
-    // console.log('parkIncome', parkIncomeList.value)
-    // console.log('parkIndustry', parkIndustryList.value)
-  } catch (error) {
-    console.log(error)
+    const res = await getBuildingInfoApi(id)
+    buildingInfo.value = res.data
+    console.log(res.data)
+  } catch (e) {
+    console.log(e)
   }
 }
 
-// 柱状图
-const initBarChart = () => {
-  const chartDom = document.getElementById('barChart')
-  const myChart = echarts.init(chartDom)
-  const option = {
-    textStyle: {
-      color: '#B4C0CC'
-    },
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: {
-        type: 'shadow'
-      }
-    },
-    grid: {
-      left: 0,
-      top: 10,
-      bottom: 20,
-      right: 0,
-      containLabel: true
-    },
-    xAxis: {
-      type: 'category',
-      data: parkIncomeList.value.xMonth
-    },
-    yAxis: {
-      type: 'value',
-      splitLine: {
-        show: false
-      }
-    },
-    series: [
-      {
-        data: parkIncomeList.value.yIncome.map((item, index) => {
-          let color = ''
-          if (index % 2 === 0) {
-            color = new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0.23, color: '#74c0f8' },
-              { offset: 1, color: 'rgba(116,192,248,0.00)' }
-            ])
-          } else {
-            color = new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0.23, color: '#ff7152' },
-              { offset: 1, color: 'rgba(255,113,82,0.00)' }
-            ])
-          }
-          return {
-            value: item,
-            itemStyle: {
-              color: color
-            }
-          }
-        }),
-        type: 'bar',
-        barWidth: 10
-      }
-    ]
+const getAreaInfo = async (id) => {
+  try {
+    const res = await getAreaInfoApi(id)
+    buildingInfo.value = res.data
+    console.log(res.data)
+  } catch (e) {
+    console.log(e)
   }
-  option && myChart.setOption(option)
-}
-// 饼图
-const initPieChart = () => {
-  const chartDom = document.getElementById('pieChart')
-  const myChart = echarts.init(chartDom)
-  const option = {
-    color: ['#00B2FF', '#2CF2FF', '#892CFF', '#FF624D', '#FFCF54', '#86ECA2'],
-    tooltip: {
-      trigger: 'item',
-      formatter: function (params) {
-        return `${params.seriesName} <br/>${params.marker}  ${params.name} ${params.percent}%`
-      }
-    },
-    legend: {
-      top: 'bottom',
-      itemWidth: 10,
-      itemHeight: 10,
-      textStyle: {
-        color: '#c6d1db'
-      }
-    },
-    series: [
-      {
-        name: '园区产业分析',
-        type: 'pie',
-        radius: ['55%', '60%'],
-        center: ['50%', '40%'],
-        label: {
-          show: false,
-          position: 'center'
-        },
-        data: parkIndustryList.value
-      }
-    ]
-  }
-  option && myChart.setOption(option)
 }
 onMounted(async () => {
   await getInfo()
   initBarChart()
   initPieChart()
+  init3dModel()
 })
+const modelStatus = computed(() => {
+  if (x.value && y.value) {
+    return true
+  } else {
+    return false
+  }
+})
+
+const close = () => {
+  x.value = ''
+  y.value = ''
+
+  console.log(x.value, y.value)
+}
 </script>
 
 <style lang="scss" scoped>
-.canvas {
-  width: 100%;
-  height: 100%;
-  background-color: #141d2e;
-}
 .header {
   width: 100%;
   height: 3.125rem;
@@ -217,6 +190,9 @@ onMounted(async () => {
   }
 }
 .all-charts {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 30rem;
   height: 100%;
   padding: 5.5rem 1.25rem 0;
@@ -231,9 +207,6 @@ onMounted(async () => {
     #01040b 70%,
     #04070d
   );
-  position: absolute;
-  top: 0;
-  left: 0;
   .section-one,
   .section-two,
   .section-three {
@@ -319,6 +292,34 @@ onMounted(async () => {
     }
     .rod-icon {
       background: url('@/assets/rod-icon.png') 50% 0px / contain no-repeat;
+    }
+  }
+}
+.model-container {
+  width: 100%;
+  height: 100%;
+  background-color: black;
+  flex-shrink: 0;
+  .tip {
+    width: 281px;
+    height: 140px;
+    background: url('@/assets/modal-bg.png') no-repeat;
+    background-size: cover;
+    color: #fff;
+    position: absolute;
+
+    .close {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      width: 20px;
+      height: 20px;
+      background: url('@/assets/modal-close.png') no-repeat;
+      background-size: cover;
+      cursor: pointer;
+    }
+    .header {
+      position: absolute;
     }
   }
 }

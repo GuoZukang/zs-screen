@@ -11,6 +11,7 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@splinetool/runtime": "^1.0.75",
     "axios": "^1.6.8",
     "echarts": "^5.5.0",
     "js-cookie": "^3.0.5",
@@ -27,6 +28,7 @@
     "eslint": "^8.49.0",
     "eslint-plugin-vue": "^9.17.0",
     "prettier": "^3.0.3",
-    "vite": "^5.1.5"
+    "vite": "^5.1.5",
+    "vite-plugin-qiankun": "^1.0.15"
   }
 }
